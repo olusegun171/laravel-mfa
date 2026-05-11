@@ -24,6 +24,7 @@ class FakeUser extends Model implements Authenticatable
         return true;
     }
 
+    public function getTwoFactorIdentifier(): string  { return $this->email; }
     public function getAuthIdentifierName(): string  { return 'id'; }
     public function getAuthIdentifier(): mixed       { return 1; }
     public function getAuthPasswordName(): string    { return 'password'; }
