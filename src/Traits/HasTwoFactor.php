@@ -24,7 +24,7 @@ trait HasTwoFactor
      */
     public function getTwoFactorIdentifier(): string
     {
-        return $this->email ?? (string) $this->getAuthIdentifier();
+        return (string) $this->getAuthIdentifier();
     }
 
     public function hasTwoFactorEnabled(): bool

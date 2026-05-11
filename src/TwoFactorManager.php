@@ -45,7 +45,7 @@ class TwoFactorManager
 
         $identifier = method_exists($user, 'getTwoFactorIdentifier')
             ? $user->getTwoFactorIdentifier()
-            : ($user->email ?? (string) $user->getAuthIdentifier());
+            : (string) $user->getAuthIdentifier();
 
         $label      = $this->issuer . ':' . $identifier;
         $otpAuthUri = $this->totp->getOtpAuthUri($secret, $label, $this->issuer);

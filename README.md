@@ -174,6 +174,28 @@ $user->hasTwoFactorPending();
 
 ---
 
+## QR Code Identifier
+
+By default, the label embedded in the QR code (and shown in authenticator apps) uses `getAuthIdentifier()` — typically the user's primary key.
+
+To use a friendlier value such as an email address, define `getTwoFactorIdentifier()` on your model:
+
+```php
+class User extends Authenticatable
+{
+    use HasTwoFactor;
+
+    public function getTwoFactorIdentifier(): string
+    {
+        return $this->email;
+    }
+}
+```
+
+The returned value is used as the account label in the `otpauth://` URI, so it appears as `YourApp:user@example.com` inside the authenticator app.
+
+---
+
 ## Configuration
 
 ```php
