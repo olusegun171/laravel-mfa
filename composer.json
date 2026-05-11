@@ -1,0 +1,72 @@
+{
+    "name": "olusegun171/laravel-mfa",
+    "description": "Multi-factor authentication for Laravel — TOTP compatible with Google Authenticator, Authy, and any RFC 6238 app.",
+    "type": "library",
+    "keywords": [
+        "2fa",
+        "totp",
+        "google-authenticator",
+        "two-factor",
+        "authentication",
+        "mfa",
+        "laravel"
+    ],
+    "homepage": "https://github.com/olusegun171/laravel-mfa",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Olusegun Mustapha",
+            "email": "olusegun171@gmail.com",
+            "homepage": "https://github.com/olusegun171",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/olusegun171/laravel-mfa/issues",
+        "source": "https://github.com/olusegun171/laravel-mfa"
+    },
+    "require": {
+        "php": "^8.1",
+        "ext-openssl": "*",
+        "illuminate/console": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^8.0|^9.0|^10.0",
+        "phpunit/phpunit": "^10.0|^11.0|^12.0|^13.0",
+        "phpstan/phpstan": "^1.10"
+    },
+    "autoload": {
+        "psr-4": {
+            "Olusegun171\\TwoFactor\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Olusegun171\\TwoFactor\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit",
+        "analyse": "vendor/bin/phpstan analyse src --level=8"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Olusegun171\\TwoFactor\\TwoFactorServiceProvider"
+            ],
+            "aliases": {
+                "TwoFactor": "Olusegun171\\TwoFactor\\Facades\\TwoFactor"
+            }
+        },
+        "branch-alias": {
+            "dev-main": "1.0-dev"
+        }
+    }
+}
