@@ -6,6 +6,7 @@ namespace Olusegun171\TwoFactor;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Olusegun171\TwoFactor\Exceptions\InvalidCodeException;
 
 class TwoFactorManager
@@ -33,7 +34,13 @@ class TwoFactorManager
      *
      * @return array<string, mixed>
      */
-    public function setup(Model&Authenticatable $user): array
+    /**
+     * Generate a new TOTP secret, QR code, and recovery codes for the user.
+     * Use this when the user is already authenticated (e.g. account settings page).
+     *
+     * @return array<string, mixed>
+     */
+    public function generate(Model&Authenticatable $user): array
     {
         $secret        = $this->totp->generateSecretKey();
         $recoveryCodes = $this->recovery->generate();
@@ -56,6 +63,21 @@ class TwoFactorManager
             'otp_auth_uri'   => $otpAuthUri,
             'recovery_codes' => $recoveryCodes,
         ];
+    }
+
+    /**
+     * Generate 2FA credentials and store the user as a pending login.
+     * Use this during an enforced login flow where the user has not yet set up 2FA.
+     *
+     * @return array<string, mixed>
+     */
+    public function setup(Model&Authenticatable $user): array
+    {
+        $data = $this->generate($user);
+
+        session()->put('two_factor.login_id', $user->getAuthIdentifier());
+
+        return $data;
     }
 
     /**
@@ -158,6 +180,61 @@ class TwoFactorManager
         $user->two_factor_recovery_codes = null;
         $user->two_factor_confirmed_at   = null;
         $user->save();
+    }
+
+    // =========================================================================
+    // Session helpers for pending 2FA login state
+    // =========================================================================
+
+    /**
+     * Returns true if 2FA is enabled for the user, and stores them as a pending login.
+     * The caller should redirect to the challenge route when this returns true.
+     */
+    public function requiresChallenge(Model&Authenticatable $user): bool
+    {
+        if (!$this->isEnabled($user)) {
+            return false;
+        }
+
+        session()->put('two_factor.login_id', $user->getAuthIdentifier());
+
+        return true;
+    }
+
+    /**
+     * Store the pending user in the session after a successful password check.
+     * Do NOT call Auth::login() until completePendingLogin() is called.
+     */
+    public function storePendingUser(Model&Authenticatable $user): void
+    {
+        session()->put('two_factor.login_id', $user->getAuthIdentifier());
+    }
+
+    /**
+     * Retrieve the pending user from the session, or null if none exists.
+     */
+    public function getPendingUser(): ?Authenticatable
+    {
+        $id = session()->get('two_factor.login_id');
+
+        return $id !== null ? Auth::getProvider()->retrieveById($id) : null;
+    }
+
+    /**
+     * Return true if there is a pending 2FA login in the session.
+     */
+    public function hasPendingUser(): bool
+    {
+        return session()->has('two_factor.login_id');
+    }
+
+    /**
+     * Clear the pending login state after a successful 2FA challenge.
+     * The caller is responsible for Auth::login() and session()->regenerate().
+     */
+    public function completePendingLogin(): void
+    {
+        session()->forget('two_factor.login_id');
     }
 
     // =========================================================================

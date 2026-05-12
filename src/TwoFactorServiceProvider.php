@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Olusegun171\TwoFactor;
 
 use Illuminate\Support\ServiceProvider;
+use Olusegun171\TwoFactor\Http\Middleware\EnsureTwoFactorAuthenticated;
 use Olusegun171\TwoFactor\Commands\TwoFactorInstallCommand;
 use Olusegun171\TwoFactor\RecoveryCodeManager;
 use Olusegun171\TwoFactor\SecretEncryptor;
@@ -45,6 +46,8 @@ class TwoFactorServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->app['router']->aliasMiddleware('two-factor', EnsureTwoFactorAuthenticated::class);
+
         if ($this->app->runningInConsole()) {
             $this->publishes([
                 __DIR__ . '/../config/two-factor.php' => config_path('two-factor.php'),
