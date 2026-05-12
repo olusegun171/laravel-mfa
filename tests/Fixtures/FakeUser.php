@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace Olusegun171\TwoFactor\Tests\Fixtures;
 
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Olusegun171\TwoFactor\Contracts\TwoFactorAuthenticatable;
+use Olusegun171\TwoFactor\Traits\HasTwoFactor;
 
 /**
  * Minimal Eloquent-like user for testing.
  * Declares 2FA properties directly so they bypass Model::__get/__set,
  * and overrides save() to avoid any database connection.
  */
-class FakeUser extends Model implements Authenticatable
+class FakeUser extends Model implements TwoFactorAuthenticatable
 {
+    use HasTwoFactor;
+
     public ?string $two_factor_secret         = null;
     public ?string $two_factor_recovery_codes = null;
     public mixed   $two_factor_confirmed_at   = null;

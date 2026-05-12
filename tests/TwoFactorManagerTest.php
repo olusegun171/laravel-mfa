@@ -69,7 +69,7 @@ class TwoFactorManagerTest extends TestCase
         $this->manager->generate($this->user);
 
         $this->assertTrue($this->manager->isPending($this->user));
-        $this->assertFalse($this->manager->isEnabled($this->user));
+        $this->assertFalse($this->user->hasTwoFactorEnabled());
     }
 
     public function test_generate_otp_auth_uri_contains_issuer_and_email(): void
@@ -175,7 +175,7 @@ class TwoFactorManagerTest extends TestCase
 
         $this->manager->confirm($this->user, $code);
 
-        $this->assertTrue($this->manager->isEnabled($this->user));
+        $this->assertTrue($this->user->hasTwoFactorEnabled());
         $this->assertFalse($this->manager->isPending($this->user));
         $this->assertNotNull($this->user->two_factor_confirmed_at);
     }
@@ -318,7 +318,7 @@ class TwoFactorManagerTest extends TestCase
         $this->manager->confirm($this->user, $this->totp->generateCode($setup['secret']));
         $this->manager->disable($this->user);
 
-        $this->assertFalse($this->manager->isEnabled($this->user));
+        $this->assertFalse($this->user->hasTwoFactorEnabled());
         $this->assertFalse($this->manager->isPending($this->user));
     }
 
@@ -326,7 +326,7 @@ class TwoFactorManagerTest extends TestCase
 
     public function test_is_not_enabled_or_pending_for_fresh_user(): void
     {
-        $this->assertFalse($this->manager->isEnabled($this->user));
+        $this->assertFalse($this->user->hasTwoFactorEnabled());
         $this->assertFalse($this->manager->isPending($this->user));
     }
 
@@ -335,7 +335,7 @@ class TwoFactorManagerTest extends TestCase
         $this->manager->generate($this->user);
 
         $this->assertTrue($this->manager->isPending($this->user));
-        $this->assertFalse($this->manager->isEnabled($this->user));
+        $this->assertFalse($this->user->hasTwoFactorEnabled());
     }
 
     public function test_is_enabled_and_not_pending_after_confirm(): void
@@ -343,7 +343,7 @@ class TwoFactorManagerTest extends TestCase
         $setup = $this->manager->generate($this->user);
         $this->manager->confirm($this->user, $this->totp->generateCode($setup['secret']));
 
-        $this->assertTrue($this->manager->isEnabled($this->user));
+        $this->assertTrue($this->user->hasTwoFactorEnabled());
         $this->assertFalse($this->manager->isPending($this->user));
     }
 }

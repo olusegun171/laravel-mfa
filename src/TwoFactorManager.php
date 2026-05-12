@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Olusegun171\TwoFactor;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Olusegun171\TwoFactor\Contracts\TwoFactorAuthenticatable;
 use Olusegun171\TwoFactor\Exceptions\InvalidCodeException;
 
 class TwoFactorManager
@@ -24,23 +24,11 @@ class TwoFactorManager
 
     /**
      * Generate a new TOTP secret, QR code, and recovery codes for the user.
-     * Persists the encrypted secret and hashed recovery codes immediately.
-     *
-     * Returns:
-     *   secret         — plain-text Base32 secret (for display only, not stored)
-     *   qr_code_url    — URL to a QR code image the user scans
-     *   otp_auth_uri   — raw otpauth:// URI
-     *   recovery_codes — plain-text one-time backup codes (show once, never again)
-     *
-     * @return array<string, mixed>
-     */
-    /**
-     * Generate a new TOTP secret, QR code, and recovery codes for the user.
      * Use this when the user is already authenticated (e.g. account settings page).
      *
      * @return array<string, mixed>
      */
-    public function generate(Model&Authenticatable $user): array
+    public function generate(TwoFactorAuthenticatable $user): array
     {
         $secret        = $this->totp->generateSecretKey();
         $recoveryCodes = $this->recovery->generate();
@@ -50,11 +38,7 @@ class TwoFactorManager
         $user->two_factor_confirmed_at   = null;
         $user->save();
 
-        $identifier = method_exists($user, 'getTwoFactorIdentifier')
-            ? $user->getTwoFactorIdentifier()
-            : (string) $user->getAuthIdentifier();
-
-        $label      = $this->issuer . ':' . $identifier;
+        $label      = "{$this->issuer}:{$user->getTwoFactorIdentifier()}";
         $otpAuthUri = $this->totp->getOtpAuthUri($secret, $label, $this->issuer);
 
         return [
@@ -71,11 +55,13 @@ class TwoFactorManager
      *
      * @return array<string, mixed>
      */
-    public function setup(Model&Authenticatable $user): array
+    public function setup(TwoFactorAuthenticatable $user): array
     {
         $data = $this->generate($user);
 
-        session()->put('two_factor.login_id', $user->getAuthIdentifier());
+        if (session()->isStarted()) {
+            session()->put('two_factor.login_id', $user->getAuthIdentifier());
+        }
 
         return $data;
     }
@@ -86,7 +72,7 @@ class TwoFactorManager
      *
      * @throws InvalidCodeException
      */
-    public function confirm(Model&Authenticatable $user, string $code): void
+    public function confirm(TwoFactorAuthenticatable $user, string $code): void
     {
         if (empty($user->two_factor_secret)) {
             throw new InvalidCodeException('Two-factor setup has not been initiated.');
@@ -109,7 +95,7 @@ class TwoFactorManager
      *
      * @throws InvalidCodeException
      */
-    public function verify(Model&Authenticatable $user, string $code): void
+    public function verify(TwoFactorAuthenticatable $user, string $code): void
     {
         if (empty($user->two_factor_secret) || empty($user->two_factor_confirmed_at)) {
             throw new InvalidCodeException('Two-factor authentication is not enabled.');
@@ -125,7 +111,7 @@ class TwoFactorManager
      *
      * @throws InvalidCodeException
      */
-    public function verifyRecoveryCode(Model&Authenticatable $user, string $code): void
+    public function verifyRecoveryCode(TwoFactorAuthenticatable $user, string $code): void
     {
         $hashedCodes = json_decode($user->two_factor_recovery_codes ?? '[]', true);
         $matchIndex  = $this->recovery->verify($code, $hashedCodes);
@@ -150,7 +136,7 @@ class TwoFactorManager
      *
      * @return string[]
      */
-    public function regenerateRecoveryCodes(Model&Authenticatable $user): array
+    public function regenerateRecoveryCodes(TwoFactorAuthenticatable $user): array
     {
         $fresh                           = $this->recovery->generate();
         $user->two_factor_recovery_codes = json_encode($this->recovery->hash($fresh));
@@ -162,9 +148,9 @@ class TwoFactorManager
     /**
      * Return how many unused recovery codes the user has left.
      */
-    public function remainingRecoveryCodes(Model&Authenticatable $user): int
+    public function remainingRecoveryCodes(TwoFactorAuthenticatable $user): int
     {
-        return count(json_decode($user->two_factor_recovery_codes ?? '[]', true));
+        return \count(json_decode($user->two_factor_recovery_codes ?? '[]', true));
     }
 
     // =========================================================================
@@ -174,7 +160,7 @@ class TwoFactorManager
     /**
      * Disable 2FA and clear all 2FA columns on the user.
      */
-    public function disable(Model&Authenticatable $user): void
+    public function disable(TwoFactorAuthenticatable $user): void
     {
         $user->two_factor_secret         = null;
         $user->two_factor_recovery_codes = null;
@@ -187,16 +173,21 @@ class TwoFactorManager
     // =========================================================================
 
     /**
-     * Returns true if 2FA is enabled for the user, and stores them as a pending login.
+     * Returns true if 2FA is confirmed for the user.
+     * In web context also stores the user as a pending login in the session.
      * The caller should redirect to the challenge route when this returns true.
      */
-    public function requiresChallenge(Model&Authenticatable $user): bool
+    public function requiresChallenge(TwoFactorAuthenticatable $user): bool
     {
         if (!$this->isEnabled($user)) {
             return false;
         }
 
-        session()->put('two_factor.login_id', $user->getAuthIdentifier());
+        // Only store pending state when a session is available (web context).
+        // Stateless API callers skip this — they carry identity in the request body instead.
+        if (session()->isStarted()) {
+            session()->put('two_factor.login_id', $user->getAuthIdentifier());
+        }
 
         return true;
     }
@@ -205,7 +196,7 @@ class TwoFactorManager
      * Store the pending user in the session after a successful password check.
      * Do NOT call Auth::login() until completePendingLogin() is called.
      */
-    public function storePendingUser(Model&Authenticatable $user): void
+    public function storePendingUser(TwoFactorAuthenticatable $user): void
     {
         session()->put('two_factor.login_id', $user->getAuthIdentifier());
     }
@@ -242,18 +233,18 @@ class TwoFactorManager
     // =========================================================================
 
     /**
-     * Return true if the user has completed 2FA setup (confirmed).
+     * Return true if the user has started but not yet confirmed 2FA setup.
      */
-    public function isEnabled(Model&Authenticatable $user): bool
+    public function isPending(TwoFactorAuthenticatable $user): bool
     {
-        return !empty($user->two_factor_confirmed_at);
+        return !empty($user->two_factor_secret) && empty($user->two_factor_confirmed_at);
     }
 
     /**
-     * Return true if the user has started but not yet confirmed 2FA setup.
+     * Internal check — use requiresChallenge() for all callers outside this class.
      */
-    public function isPending(Model&Authenticatable $user): bool
+    private function isEnabled(TwoFactorAuthenticatable $user): bool
     {
-        return !empty($user->two_factor_secret) && empty($user->two_factor_confirmed_at);
+        return !empty($user->two_factor_confirmed_at);
     }
 }
