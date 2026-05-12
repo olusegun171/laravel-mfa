@@ -193,15 +193,6 @@ class TwoFactorManager
     }
 
     /**
-     * Store the pending user in the session after a successful password check.
-     * Do NOT call Auth::login() until completePendingLogin() is called.
-     */
-    public function storePendingUser(Model&Authenticatable $user): void
-    {
-        session()->put('two_factor.login_id', $user->getAuthIdentifier());
-    }
-
-    /**
      * Retrieve the pending user from the session, or null if none exists.
      */
     public function getPendingUser(): ?Authenticatable
@@ -214,16 +205,27 @@ class TwoFactorManager
     /**
      * Return true if there is a pending 2FA login in the session.
      */
-    public function hasPendingUser(): bool
+    public function hasPendingChallenge(): bool
     {
-        return session()->has('two_factor.login_id');
+        if (!session()->has('two_factor.login_id')) {
+            return false;
+        }
+
+        $user = $this->getPendingUser();
+
+        if ($user instanceof Model && (!empty($user->two_factor_secret) || $this->isEnabled($user))) {
+            return true;
+        }
+
+        session()->forget('two_factor.login_id');
+        return false;
     }
 
     /**
      * Clear the pending login state after a successful 2FA challenge.
      * The caller is responsible for Auth::login() and session()->regenerate().
      */
-    public function completePendingLogin(): void
+    public function completeChallenge(): void
     {
         session()->forget('two_factor.login_id');
     }
@@ -231,14 +233,6 @@ class TwoFactorManager
     // =========================================================================
     // Status helpers
     // =========================================================================
-
-    /**
-     * Return true if the user has started but not yet confirmed 2FA setup.
-     */
-    public function isPending(Model&Authenticatable $user): bool
-    {
-        return !empty($user->two_factor_secret) && empty($user->two_factor_confirmed_at);
-    }
 
     /**
      * Internal check — use requiresChallenge() for all callers outside this class.

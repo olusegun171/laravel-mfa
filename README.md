@@ -6,7 +6,7 @@ Multi-factor authentication for Laravel. Works with Google Authenticator, Authy,
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/olusegun171/laravel-mfa.svg)](https://packagist.org/packages/olusegun171/laravel-mfa)
 [![Total Downloads](https://img.shields.io/packagist/dt/olusegun171/laravel-mfa.svg)](https://packagist.org/packages/olusegun171/laravel-mfa)
 [![PHP](https://img.shields.io/badge/PHP-%3E%3D8.1-blue)](https://php.net)
-[![Laravel](https://img.shields.io/badge/Laravel-10%2F11%2F12-red)](https://laravel.com)
+[![Laravel](https://img.shields.io/badge/Laravel-10%2F11%2F12%2F13-red)](https://laravel.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 ---
@@ -25,7 +25,7 @@ Multi-factor authentication for Laravel. Works with Google Authenticator, Authy,
 ## Requirements
 
 - PHP 8.1+
-- Laravel 10, 11, or 12
+- Laravel 10, 11, 12, or 13
 
 ---
 
@@ -89,13 +89,11 @@ See the [Integration](#integration) section for full usage examples split by aut
 ## Status Helpers
 
 ```php
-TwoFactor::isEnabled($user);            // true once two_factor_confirmed_at is set
-TwoFactor::isPending($user);            // true if setup started but not yet confirmed
 TwoFactor::remainingRecoveryCodes($user); // number of unused backup codes
 
-// Equivalent model methods via HasTwoFactor trait
-$user->hasTwoFactorEnabled();
-$user->hasTwoFactorPending();
+// Model methods via HasTwoFactor trait
+$user->hasTwoFactorEnabled();  // true once two_factor_confirmed_at is set
+$user->hasTwoFactorPending();  // true if setup started but not yet confirmed
 ```
 
 ---
@@ -247,7 +245,7 @@ public function store(Request $request)
         return back()->withErrors(['code' => $e->getMessage()]);
     }
 
-    TwoFactor::completePendingLogin();
+    TwoFactor::completeChallenge();
     Auth::login($user);
     $request->session()->regenerate();
 
@@ -265,7 +263,7 @@ public function recover(Request $request)
         return back()->withErrors(['recovery_code' => $e->getMessage()]);
     }
 
-    TwoFactor::completePendingLogin();
+    TwoFactor::completeChallenge();
     Auth::login($user);
     $request->session()->regenerate();
 
@@ -273,7 +271,7 @@ public function recover(Request $request)
 }
 ```
 
-`completePendingLogin()` clears the pending session state. The caller is responsible for `Auth::login()` and `session()->regenerate()`.
+`completeChallenge()` clears the pending session state. The caller is responsible for `Auth::login()` and `session()->regenerate()`.
 
 ---
 

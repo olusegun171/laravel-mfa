@@ -16,11 +16,9 @@ use Illuminate\Support\Facades\Facade;
  * @method static int                                                    remainingRecoveryCodes(\Illuminate\Database\Eloquent\Model&\Illuminate\Contracts\Auth\Authenticatable $user)
  * @method static void                                                   disable(\Illuminate\Database\Eloquent\Model&\Illuminate\Contracts\Auth\Authenticatable $user)
  * @method static bool                                                   requiresChallenge(\Illuminate\Database\Eloquent\Model&\Illuminate\Contracts\Auth\Authenticatable $user)
- * @method static void                                                   storePendingUser(\Illuminate\Database\Eloquent\Model&\Illuminate\Contracts\Auth\Authenticatable $user)
  * @method static \Illuminate\Contracts\Auth\Authenticatable|null       getPendingUser()
- * @method static bool                                                   hasPendingUser()
- * @method static void                                                   completePendingLogin()
- * @method static bool                                                   isPending(\Illuminate\Database\Eloquent\Model&\Illuminate\Contracts\Auth\Authenticatable $user)
+ * @method static bool                                                   hasPendingChallenge()
+ * @method static void                                                   completeChallenge()
  *
  * @see \Olusegun171\TwoFactor\TwoFactorManager
  */

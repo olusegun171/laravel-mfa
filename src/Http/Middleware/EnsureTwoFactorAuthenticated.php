@@ -20,7 +20,7 @@ class EnsureTwoFactorAuthenticated
      */
     public function handle(Request $request, Closure $next, string $route = 'login'): Response
     {
-        if (!$this->manager->hasPendingUser()) {
+        if (!$this->manager->hasPendingChallenge()) {
             return redirect()->route($route);
         }
 

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Olusegun171\TwoFactor\Tests;
 
+use Illuminate\Support\Facades\Auth;
 use Olusegun171\TwoFactor\Exceptions\InvalidCodeException;
 use Olusegun171\TwoFactor\RecoveryCodeManager;
 use Olusegun171\TwoFactor\SecretEncryptor;
 use Olusegun171\TwoFactor\Tests\Fixtures\FakeUser;
+use Olusegun171\TwoFactor\Tests\Fixtures\FakeUserProvider;
 use Olusegun171\TwoFactor\TwoFactorAuth;
 use Olusegun171\TwoFactor\TwoFactorManager;
 
@@ -29,6 +31,10 @@ class TwoFactorManagerTest extends TestCase
             'TestApp',
         );
         $this->user = new FakeUser();
+
+        Auth::provider('fake', fn () => new FakeUserProvider($this->user));
+        $this->app['config']->set('auth.providers.fake_users', ['driver' => 'fake']);
+        $this->app['config']->set('auth.guards.web.provider', 'fake_users');
     }
 
     protected function startSession(): void
@@ -68,7 +74,7 @@ class TwoFactorManagerTest extends TestCase
     {
         $this->manager->generate($this->user);
 
-        $this->assertTrue($this->manager->isPending($this->user));
+        $this->assertTrue($this->user->hasTwoFactorPending());
         $this->assertFalse($this->user->hasTwoFactorEnabled());
     }
 
@@ -100,7 +106,7 @@ class TwoFactorManagerTest extends TestCase
 
         $this->manager->setup($this->user);
 
-        $this->assertTrue($this->manager->hasPendingUser());
+        $this->assertTrue($this->manager->hasPendingChallenge());
         $this->assertSame(1, session('two_factor.login_id'));
     }
 
@@ -111,7 +117,7 @@ class TwoFactorManagerTest extends TestCase
         $this->startSession();
 
         $this->assertFalse($this->manager->requiresChallenge($this->user));
-        $this->assertFalse($this->manager->hasPendingUser());
+        $this->assertFalse($this->manager->hasPendingChallenge());
     }
 
     public function test_requires_challenge_returns_true_and_stores_pending_when_enabled(): void
@@ -124,45 +130,38 @@ class TwoFactorManagerTest extends TestCase
         $result = $this->manager->requiresChallenge($this->user);
 
         $this->assertTrue($result);
-        $this->assertTrue($this->manager->hasPendingUser());
+        $this->assertTrue($this->manager->hasPendingChallenge());
         $this->assertSame(1, session('two_factor.login_id'));
     }
 
-    // ── storePendingUser() / hasPendingUser() / completePendingLogin() ────────
-
-    public function test_store_pending_user_puts_user_id_in_session(): void
-    {
-        $this->startSession();
-
-        $this->manager->storePendingUser($this->user);
-
-        $this->assertSame(1, session('two_factor.login_id'));
-    }
+    // ── hasPendingChallenge() / completeChallenge() ────────────────────────────
 
     public function test_has_pending_user_returns_false_when_session_empty(): void
     {
         $this->startSession();
 
-        $this->assertFalse($this->manager->hasPendingUser());
+        $this->assertFalse($this->manager->hasPendingChallenge());
     }
 
-    public function test_has_pending_user_returns_true_after_storing(): void
+    public function test_has_pending_user_returns_true_after_requires_challenge(): void
     {
         $this->startSession();
+        $setup = $this->manager->generate($this->user);
+        $this->manager->confirm($this->user, $this->totp->generateCode($setup['secret']));
 
-        $this->manager->storePendingUser($this->user);
+        $this->manager->requiresChallenge($this->user);
 
-        $this->assertTrue($this->manager->hasPendingUser());
+        $this->assertTrue($this->manager->hasPendingChallenge());
     }
 
     public function test_complete_pending_login_clears_session(): void
     {
         $this->startSession();
+        session()->put('two_factor.login_id', $this->user->getAuthIdentifier());
 
-        $this->manager->storePendingUser($this->user);
-        $this->manager->completePendingLogin();
+        $this->manager->completeChallenge();
 
-        $this->assertFalse($this->manager->hasPendingUser());
+        $this->assertFalse($this->manager->hasPendingChallenge());
         $this->assertNull(session('two_factor.login_id'));
     }
 
@@ -176,7 +175,7 @@ class TwoFactorManagerTest extends TestCase
         $this->manager->confirm($this->user, $code);
 
         $this->assertTrue($this->user->hasTwoFactorEnabled());
-        $this->assertFalse($this->manager->isPending($this->user));
+        $this->assertFalse($this->user->hasTwoFactorPending());
         $this->assertNotNull($this->user->two_factor_confirmed_at);
     }
 
@@ -319,7 +318,7 @@ class TwoFactorManagerTest extends TestCase
         $this->manager->disable($this->user);
 
         $this->assertFalse($this->user->hasTwoFactorEnabled());
-        $this->assertFalse($this->manager->isPending($this->user));
+        $this->assertFalse($this->user->hasTwoFactorPending());
     }
 
     // ── isEnabled() / isPending() ─────────────────────────────────────────────
@@ -327,14 +326,14 @@ class TwoFactorManagerTest extends TestCase
     public function test_is_not_enabled_or_pending_for_fresh_user(): void
     {
         $this->assertFalse($this->user->hasTwoFactorEnabled());
-        $this->assertFalse($this->manager->isPending($this->user));
+        $this->assertFalse($this->user->hasTwoFactorPending());
     }
 
     public function test_is_pending_after_generate_before_confirm(): void
     {
         $this->manager->generate($this->user);
 
-        $this->assertTrue($this->manager->isPending($this->user));
+        $this->assertTrue($this->user->hasTwoFactorPending());
         $this->assertFalse($this->user->hasTwoFactorEnabled());
     }
 
@@ -344,6 +343,6 @@ class TwoFactorManagerTest extends TestCase
         $this->manager->confirm($this->user, $this->totp->generateCode($setup['secret']));
 
         $this->assertTrue($this->user->hasTwoFactorEnabled());
-        $this->assertFalse($this->manager->isPending($this->user));
+        $this->assertFalse($this->user->hasTwoFactorPending());
     }
 }
